@@ -1,6 +1,7 @@
 package com.picur.demo.service;
 
 import com.picur.demo.DTO.Request.CrearCuentaRequest;
+import com.picur.demo.DTO.Request.LoginRequest;
 import com.picur.demo.DTO.Respo.CrearCuentaResponse;
 
 import java.util.List;
@@ -8,6 +9,8 @@ import java.util.List;
 public interface CrearCuentaService {
 
     CrearCuentaResponse crearCuenta(CrearCuentaRequest request);
+
+    CrearCuentaResponse login(LoginRequest request);
 
     List<CrearCuentaResponse> listarUsuarios();
 

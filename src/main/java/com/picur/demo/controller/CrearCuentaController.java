@@ -1,6 +1,7 @@
 package com.picur.demo.controller;
 
 import com.picur.demo.DTO.Request.CrearCuentaRequest;
+import com.picur.demo.DTO.Request.LoginRequest;
 import com.picur.demo.DTO.Respo.CrearCuentaResponse;
 import com.picur.demo.service.CrearCuentaService;
 import jakarta.validation.Valid;
@@ -33,6 +34,18 @@ public class CrearCuentaController {
         return ResponseEntity
                 .status(HttpStatus.CREATED)
                 .body(response);
+    }
+
+
+    // INICIAR SESIÓN
+    @PostMapping("/login")
+    public ResponseEntity<CrearCuentaResponse> iniciarSesion(
+            @Valid @RequestBody LoginRequest request) {
+
+        CrearCuentaResponse response =
+                service.login(request);
+
+        return ResponseEntity.ok(response);
     }
 
 

@@ -13,6 +13,8 @@ public class MedicionVibracion {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    private String dispositivo;
+
     private Double aceleracionX;
 
     private Double aceleracionY;
@@ -32,10 +34,11 @@ public class MedicionVibracion {
 
     private LocalDateTime fechaRegistro;
 
-    public MedicionVibracion(Long id, Double aceleracionX, Double aceleracionY, Double aceleracionZ, Double frecuencia,
+    public MedicionVibracion(Long id, String dispositivo, Double aceleracionX, Double aceleracionY, Double aceleracionZ, Double frecuencia,
             Double rms, Double inclinacion, EstadoVibracion estado, Double indiceAnomalia,
             LocalDateTime fechaRegistro) {
         this.id = id;
+        this.dispositivo = dispositivo;
         this.aceleracionX = aceleracionX;
         this.aceleracionY = aceleracionY;
         this.aceleracionZ = aceleracionZ;
@@ -56,6 +59,14 @@ public class MedicionVibracion {
 
     public void setId(Long id) {
         this.id = id;
+    }
+
+    public String getDispositivo() {
+        return dispositivo;
+    }
+
+    public void setDispositivo(String dispositivo) {
+        this.dispositivo = dispositivo;
     }
 
     public Double getAceleracionX() {
