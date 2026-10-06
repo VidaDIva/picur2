@@ -26,6 +26,8 @@ public class MedicionVibracionMapper {
             medicones.getFrecuencia(),
             medicones.getRms(),
             medicones.getInclinacion(),
+            medicones.getVibracion(),
+            medicones.getUmbral(),
             medicones.getEstado(),
             medicones.getIndiceAnomalia(),
             medicones.getFechaRegistro()

@@ -25,7 +25,16 @@ public record MedicionVibracionSensorRequest(
 
     Double rms,
 
-    Double inclinacion
+    Double inclinacion,
+
+    /** Índice de vibración calculado por el dispositivo (opcional: firmware antiguo no lo envía). */
+    Double vibracion,
+
+    /** Umbral dinámico aprendido por el dispositivo (opcional). */
+    Double umbral,
+
+    /** Estado clasificado por el dispositivo: NORMAL | ANOMALIA | PELIGRO (opcional). */
+    String estado
 ) {
     
 }

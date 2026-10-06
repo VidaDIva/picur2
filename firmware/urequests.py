@@ -48,6 +48,10 @@ def request(method, url, data=None, json=None, headers={}, stream=None):
     ai = usocket.getaddrinfo(host, port)
     addr = ai[0][4]
     sock = usocket.socket()
+    # Sin timeout, una red degradada colgaba el loop para siempre.
+    # 2 s por operación: el peor caso (conexión + línea + cuerpo) queda
+    # por debajo de los 8 s del watchdog.
+    sock.settimeout(2000)
     sock.connect(addr)
     if proto == "https:":
         import ussl

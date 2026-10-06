@@ -12,6 +12,8 @@ public record MedicionVibracionResponse(
     Double frecuencia,
     Double rms,
     Double inclinacion,
+    Double vibracion,
+    Double umbral,
     EstadoVibracion estado,
     Double indiceAnomalia,
     LocalDateTime fechaRegistro

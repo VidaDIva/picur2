@@ -27,6 +27,12 @@ public class MedicionVibracion {
 
     private Double inclinacion;
 
+    /** Índice de vibración calculado por el dispositivo (MPU + piezo). */
+    private Double vibracion;
+
+    /** Umbral dinámico aprendido por el dispositivo (límite de tráfico normal). */
+    private Double umbral;
+
     @Enumerated(EnumType.STRING)
     private EstadoVibracion estado;
 
@@ -115,6 +121,22 @@ public class MedicionVibracion {
 
     public void setInclinacion(Double inclinacion) {
         this.inclinacion = inclinacion;
+    }
+
+    public Double getVibracion() {
+        return vibracion;
+    }
+
+    public void setVibracion(Double vibracion) {
+        this.vibracion = vibracion;
+    }
+
+    public Double getUmbral() {
+        return umbral;
+    }
+
+    public void setUmbral(Double umbral) {
+        this.umbral = umbral;
     }
 
     public EstadoVibracion getEstado() {

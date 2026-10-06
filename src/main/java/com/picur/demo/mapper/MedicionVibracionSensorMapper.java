@@ -14,6 +14,8 @@ public class MedicionVibracionSensorMapper {
         medicion.setFrecuencia(request.frecuencia());
         medicion.setRms(request.rms());
         medicion.setInclinacion(request.inclinacion());
+        medicion.setVibracion(request.vibracion());
+        medicion.setUmbral(request.umbral());
         return medicion;
     }
 }

@@ -3,6 +3,14 @@ import time
 
 UMBRAL_FRECUENCIA_G = 0.02
 
+# --- Muestreo de ventana ---
+MUESTRA_MS = 5              # período entre muestras (~200 Hz)
+N_MUESTRAS = 20             # muestras por ventana -> ventana de ~100 ms
+
+# --- Índice de vibración = W_MPU * (std aceleración en mg) + W_PIEZO * (std piezo ADC 12 bits)
+W_MPU = 1.0
+W_PIEZO = 0.2
+
 
 def capturar_burst(mpu, num_muestras):
     """Lee num_muestras seguidas lo mas rapido posible.
@@ -126,3 +134,84 @@ def calcular_inclinacion(ax, ay, az):
     pitch = math.atan2(-ax, math.sqrt(ay * ay + az * az))
     grados = math.degrees(math.sqrt(roll * roll + pitch * pitch))
     return round(grados, 2)
+
+
+def calc_media_std(datos):
+    """Media y desviación estándar poblacional de una lista."""
+    n = len(datos)
+    media = sum(datos) / n
+    var = sum((x - media) ** 2 for x in datos) / n
+    return media, math.sqrt(var)
+
+
+def leer_ventana(mpu, piezo, sirena=None):
+    """Toma N_MUESTRAS lecturas (~100 ms) y resume la ventana:
+      media       : (x, y, z) en g (vector gravedad)
+      frecuencia  : frecuencia dominante por cruces por cero (Hz)
+      rms         : RMS combinado de vibración (g)
+      inclinacion : pitch+roll combinados en grados (RSS)
+      vib         : índice de vibración combinado (MPU + piezo)
+      pitch/roll  : inclinación media de la ventana (grados, firmes)
+      pico_g      : pico de aceleración dentro de la ventana (g)
+      giro_max    : velocidad angular máxima (°/s)
+      limpia      : False si la sirena contaminó la ventana
+    """
+    limpia = sirena.ventana_limpia() if sirena else True
+
+    mags, pz, muestras = [], [], []
+    sax = say = saz = 0.0
+    giro_max = 0.0
+    t_sig = time.ticks_ms()
+
+    for _ in range(N_MUESTRAS):
+        ax, ay, az, gx, gy, gz = mpu.leer()
+        muestras.append((ax, ay, az))
+        mags.append(math.sqrt(ax * ax + ay * ay + az * az))
+        pz.append(piezo.leer_muestra())
+        sax += ax
+        say += ay
+        saz += az
+        g = math.sqrt(gx * gx + gy * gy + gz * gz)
+        if g > giro_max:
+            giro_max = g
+
+        if sirena:
+            sirena.actualizar()                           # mantiene la sirena sonando
+
+        t_sig = time.ticks_add(t_sig, MUESTRA_MS)         # cadencia estable
+        espera = time.ticks_diff(t_sig, time.ticks_ms())
+        if espera > 0:
+            time.sleep_ms(espera)
+
+    if sirena and not sirena.ventana_limpia():
+        limpia = False
+
+    mag_media, mag_std = calc_media_std(mags)
+    pico_g = max(abs(m - mag_media) for m in mags)
+    _pz_media, pz_std = calc_media_std(pz)
+
+    vib = W_MPU * (mag_std * 1000.0) + W_PIEZO * pz_std   # mag_std en mg
+
+    media_x, media_y, media_z = media_vector(muestras)
+    rms = calcular_rms(muestras)["rms"]
+    frecuencia = calcular_frecuencia(muestras, 1000.0 / MUESTRA_MS)
+    inclinacion = calcular_inclinacion(media_x, media_y, media_z)
+
+    ax_m = sax / N_MUESTRAS
+    ay_m = say / N_MUESTRAS
+    az_m = saz / N_MUESTRAS
+    pitch = math.degrees(math.atan2(ax_m, math.sqrt(ay_m * ay_m + az_m * az_m)))
+    roll = math.degrees(math.atan2(ay_m, az_m))
+
+    return {
+        "media": (media_x, media_y, media_z),
+        "frecuencia": frecuencia,
+        "rms": rms,
+        "inclinacion": inclinacion,
+        "vib": vib,
+        "pitch": pitch,
+        "roll": roll,
+        "pico_g": pico_g,
+        "giro_max": giro_max,
+        "limpia": limpia,
+    }
