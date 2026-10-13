@@ -3,14 +3,12 @@ package com.picur.demo.service.impl;
 import com.picur.demo.DTO.Respo.AsistenteResponse;
 import com.picur.demo.DTO.Respo.RecomendacionResponse;
 import com.picur.demo.mapper.RecomendacionMapper;
-import com.picur.demo.model.CrearCuenta;
 import com.picur.demo.model.MedicionVibracion;
 import com.picur.demo.model.Recomendacion;
-import com.picur.demo.repository.CrearCuentaRepository;
 import com.picur.demo.repository.MedicionVibracionRepository;
 import com.picur.demo.repository.RecomendacionRepository;
 import com.picur.demo.service.AsistenteService;
-import com.picur.demo.service.NotificacionService;
+import com.picur.demo.service.ContextoVibracion;
 import jakarta.annotation.PostConstruct;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -33,21 +31,18 @@ public class AsistenteServiceImpl implements AsistenteService {
     private final MotorAprendizaje motor;
     private final RecomendacionRepository recomendacionRepository;
     private final MedicionVibracionRepository medicionRepository;
-    private final CrearCuentaRepository usuarioRepository;
-    private final NotificacionService notificaciones;
+    private final NotificacionRecomendacionService notificador;
 
     private final Map<String, String> estadoAnterior = new ConcurrentHashMap<>();
 
     public AsistenteServiceImpl(MotorAprendizaje motor,
                                 RecomendacionRepository recomendacionRepository,
                                 MedicionVibracionRepository medicionRepository,
-                                CrearCuentaRepository usuarioRepository,
-                                NotificacionService notificaciones) {
+                                NotificacionRecomendacionService notificador) {
         this.motor = motor;
         this.recomendacionRepository = recomendacionRepository;
         this.medicionRepository = medicionRepository;
-        this.usuarioRepository = usuarioRepository;
-        this.notificaciones = notificaciones;
+        this.notificador = notificador;
     }
 
     @PostConstruct
@@ -81,10 +76,11 @@ public class AsistenteServiceImpl implements AsistenteService {
         estadoAnterior.put(dispositivo, actual);
 
         Recomendacion recomendacion = construir(medicion, resultado);
-        recomendacionRepository.save(recomendacion);
+        recomendacion = recomendacionRepository.save(recomendacion);
 
         if (!MotorAprendizaje.Severidad.NORMAL.name().equals(actual)) {
-            alertarUsuarios(recomendacion);
+            notificador.procesar(recomendacion.getId(),
+                    contexto(medicion, resultado, recomendacion));
         }
     }
 
@@ -265,46 +261,41 @@ public class AsistenteServiceImpl implements AsistenteService {
         return new Texto(titulo, recomendacion);
     }
 
-    private void alertarUsuarios(Recomendacion recomendacion) {
-
-        boolean critico = SEVERIDAD_ANOMALA.equals(recomendacion.getSeveridad());
-        String prefijo = critico ? "[PICUR ANOMALA] " : "[PICUR PRECAUCION] ";
-        String asunto = prefijo + recomendacion.getTitulo();
-
-        StringBuilder sms = new StringBuilder();
-        sms.append(recomendacion.getTitulo()).append(". ");
-        sms.append(recomendacion.getRecomendacion());
-        if (recomendacion.getIndice() != null) {
-            sms.append(" Indice ").append(recomendacion.getIndice())
-                    .append(". Sensor ").append(recomendacion.getDispositivo()).append(".");
-        }
-
-        for (CrearCuenta usuario : usuarioRepository.findAll()) {
-            notificaciones.enviarSms(usuario.getCelular(), sms.toString());
-            notificaciones.enviarCorreo(usuario.getCorreo(), asunto,
-                    cuerpoCorreo(usuario.getNombre(), recomendacion));
-        }
+    private ContextoVibracion contexto(MedicionVibracion medicion,
+                                       MotorAprendizaje.Resultado resultado,
+                                       Recomendacion recomendacion) {
+        return new ContextoVibracion(
+                dispositivo(medicion),
+                resultado.severidad().name(),
+                resultado.metrica(),
+                medicion.getIndiceAnomalia(),
+                resultado.zMaxima(),
+                resultado.tendenciaCreciente(),
+                recomendacion.getTitulo(),
+                recomendacion.getRecomendacion(),
+                resumenSensores(medicion));
     }
 
-    private String cuerpoCorreo(String nombre, Recomendacion r) {
-        boolean critico = SEVERIDAD_ANOMALA.equals(r.getSeveridad());
-        String color = critico ? "#dc2626" : "#f59e0b";
+    private String resumenSensores(MedicionVibracion m) {
+        StringBuilder sb = new StringBuilder();
+        agregar(sb, "vibracion", m.getVibracion());
+        agregar(sb, "rms", m.getRms());
+        agregar(sb, "frecuencia", m.getFrecuencia());
+        agregar(sb, "inclinacion", m.getInclinacion());
+        agregar(sb, "aceleracionX", m.getAceleracionX());
+        agregar(sb, "aceleracionY", m.getAceleracionY());
+        agregar(sb, "aceleracionZ", m.getAceleracionZ());
+        return sb.toString();
+    }
 
-        return "<div style=\"font-family:Arial,sans-serif;max-width:520px;margin:0 auto;\">"
-                + "<div style=\"background:" + color + ";color:white;padding:14px 18px;"
-                + "border-radius:10px 10px 0 0;font-weight:800;letter-spacing:1px;\">"
-                + (critico ? "ALERTA CRITICA" : "ALERTA DE PRECAUCION") + "</div>"
-                + "<div style=\"border:1px solid #e8ebf0;border-top:none;padding:18px;"
-                + "border-radius:0 0 10px 10px;\">"
-                + "<h2 style=\"margin:0 0 8px;color:#172033;font-size:18px;\">"
-                + r.getTitulo() + "</h2>"
-                + "<p style=\"margin:0 0 12px;color:#4b5563;font-size:14px;\">"
-                + r.getRecomendacion() + "</p>"
-                + "<p style=\"margin:0;color:#6b7280;font-size:13px;\">"
-                + "Sensor: " + r.getDispositivo()
-                + " · Indice: " + (r.getIndice() == null ? "-" : r.getIndice())
-                + " · " + (r.getMetrica() == null ? "sin metrica especifica" : r.getMetrica())
-                + "</p></div></div>";
+    private void agregar(StringBuilder sb, String nombre, Double valor) {
+        if (valor == null) {
+            return;
+        }
+        if (sb.length() > 0) {
+            sb.append(", ");
+        }
+        sb.append(nombre).append('=').append(valor);
     }
 
     private String dispositivo(MedicionVibracion m) {

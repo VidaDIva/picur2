@@ -79,13 +79,4 @@ public class NotificacionServiceImpl implements NotificacionService {
                     destino, e.getMessage());
         }
     }
-
-    @Override
-    @Async("notificacionesExecutor")
-    public void enviarSms(String celular, String mensaje) {
-        if (celular == null || celular.isBlank()) {
-            return;
-        }
-        log.info("[SMS simulado] para={} mensaje={}", celular, mensaje);
-    }
 }

@@ -48,18 +48,14 @@ public class RecuperacionContrasenaServiceImpl
 
         CrearCuenta usuario = buscarUsuario(request.contacto());
 
-        String metodo = request.metodo().trim().toUpperCase();
-        boolean porSms = "SMS".equals(metodo);
-        String destino = porSms ? usuario.getCelular() : usuario.getCorreo();
-
-        String contacto = usuario.getCorreo();
-        codigoRepository.invalidarCodigosPrevios(contacto);
+        String destino = usuario.getCorreo();
+        codigoRepository.invalidarCodigosPrevios(destino);
 
         String codigo = generarCodigo();
 
         CodigoRecuperacion entidad = new CodigoRecuperacion();
-        entidad.setContacto(contacto);
-        entidad.setMetodo(metodo);
+        entidad.setContacto(destino);
+        entidad.setMetodo("EMAIL");
         entidad.setCodigoHash(passwordEncoder.encode(codigo));
         entidad.setExpiracion(LocalDateTime.now().plusMinutes(DURACION_MINUTOS));
         entidad.setUsado(false);
@@ -67,18 +63,12 @@ public class RecuperacionContrasenaServiceImpl
         entidad.setCreadoEn(LocalDateTime.now());
         codigoRepository.save(entidad);
 
-        if (porSms) {
-            notificaciones.enviarSms(destino,
-                    "Tu codigo para recuperar tu cuenta Picur es: " + codigo
-                            + ". Vence en " + DURACION_MINUTOS + " minutos.");
-        } else {
-            notificaciones.enviarCorreo(destino,
-                    "Recuperacion de contrasena - Picur",
-                    cuerpoCorreo(usuario.getNombre(), codigo));
-        }
+        notificaciones.enviarCorreo(destino,
+                "Recuperacion de contrasena - Picur",
+                cuerpoCorreo(usuario.getNombre(), codigo));
 
         return new MensajeResponse(
-                "Codigo enviado a " + enmascarar(destino) + " por " + metodo
+                "Codigo enviado a " + enmascarar(destino)
                         + ". Vence en " + DURACION_MINUTOS + " minutos.");
     }
 

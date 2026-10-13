@@ -4,7 +4,7 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
 
 public record RestablecerContrasenaRequest(
-    @NotBlank(message = "El correo o celular es obligatorio")
+    @NotBlank(message = "El correo es obligatorio")
     String contacto,
 
     @NotBlank(message = "El código es obligatorio")
