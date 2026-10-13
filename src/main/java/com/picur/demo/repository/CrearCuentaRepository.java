@@ -9,5 +9,7 @@ public interface CrearCuentaRepository extends JpaRepository<CrearCuenta, Long> 
 
     Optional<CrearCuenta> findByCorreo(String correo);
 
+    Optional<CrearCuenta> findByCelular(String celular);
+
     boolean existsByCorreo(String correo);
 }

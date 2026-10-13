@@ -1,0 +1,18 @@
+package com.picur.demo.DTO.Request;
+
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Size;
+
+public record RestablecerContrasenaRequest(
+    @NotBlank(message = "El correo o celular es obligatorio")
+    String contacto,
+
+    @NotBlank(message = "El código es obligatorio")
+    String codigo,
+
+    @NotBlank(message = "La nueva contraseña es obligatoria")
+    @Size(min = 6, message = "La contraseña debe tener al menos 6 caracteres")
+    String nuevaContrasena
+) {
+
+}

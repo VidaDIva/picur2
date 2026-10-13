@@ -14,6 +14,7 @@ import com.picur.demo.mapper.MedicionVibracionSensorMapper;
 import com.picur.demo.model.MedicionVibracion;
 import com.picur.demo.repository.MedicionVibracionRepository;
 import com.picur.demo.service.AnalizadorVibracionService;
+import com.picur.demo.service.AsistenteService;
 import com.picur.demo.service.MedicionVibracionService;
 
 import org.springframework.data.domain.Page;
@@ -36,13 +37,16 @@ public class MedicionVibracionServiceImpl implements MedicionVibracionService {
     private final MedicionVibracionRepository repository;
     private final AnalizadorVibracionService analizador;
     private final VibracionWebSocketHandler notificador;
+    private final AsistenteService asistente;
 
     public MedicionVibracionServiceImpl(MedicionVibracionRepository repository,
             AnalizadorVibracionService analizador,
-            VibracionWebSocketHandler notificador) {
+            VibracionWebSocketHandler notificador,
+            AsistenteService asistente) {
         this.repository = repository;
         this.analizador = analizador;
         this.notificador = notificador;
+        this.asistente = asistente;
     }
 
     @Override
@@ -56,6 +60,7 @@ public class MedicionVibracionServiceImpl implements MedicionVibracionService {
         MedicionVibracion guardada = repository.save(medicion);
 
         notificar(guardada);
+        asistente.analizar(guardada);
 
         return MedicionVibracionMapper.dto(guardada);
     }
@@ -83,6 +88,7 @@ public class MedicionVibracionServiceImpl implements MedicionVibracionService {
         repository.save(medicion);
 
         notificar(medicion);
+        asistente.analizar(medicion);
 
         return new MedicionVibracionSensorResponse(
                 true,

@@ -11,6 +11,7 @@ import sirena
 import api_client
 import procesar
 import clasificador
+import lcd_i2c
 
 
 def timestamp_iso():
@@ -52,6 +53,21 @@ def enviar(w, base, estado):
     return ok
 
 
+def mostrar_lcd(lcd, estado, w, base):
+    """Refresca la pantalla LCD 16x2: linea 1 el estado, linea 2 los datos.
+
+    w es la ultima ventana limpia (o None si aun no hay mediciones)."""
+    if lcd is None:
+        return
+    nombre = clasificador.NOMBRE_ESTADO[estado]
+    if w is None:
+        lcd.mostrar("EST:" + nombre, "Esperando...")
+        return
+    linea2 = "V{:.2f} U{:.2f} F{:.0f}".format(
+        w["vib"], base["umbral_normal"], w["frecuencia"])
+    lcd.mostrar("EST:" + nombre, linea2)
+
+
 def main():
     try:
         causa = machine.reset_cause()
@@ -88,17 +104,38 @@ def main():
             time.sleep_ms(1000)
     sem.apagar()
 
+    # --- LCD 16x2 I2C (comparte el bus del MPU, direccion 0x27/0x3F) ---
+    lcd = None
+    for direccion in (0x27, 0x3F):
+        try:
+            lcd = lcd_i2c.LcdI2C(mpu.i2c, direccion=direccion)
+            print("[main] LCD 16x2 listo en 0x{:02X}".format(direccion))
+            break
+        except Exception as e:
+            print("[main] LCD no responde en 0x{:02X}: {}".format(
+                direccion, e))
+    if lcd is not None:
+        lcd.mostrar("Picur", "Iniciando...")
+    else:
+        print("[main] Sin LCD: se continua solo con LEDs/envios.")
+
     # --- Autotest de arranque (LEDs + audio) ---
     sem.autotest()
     sir.pitido()
 
     # --- Aprendizaje de la línea base (~10 s, sin envíos) ---
+    def al_avance_calibracion(ventana):
+        sem.parpadeo_aprendizaje(ventana)
+        if lcd is not None and ventana % 10 == 0:
+            pct = min(100, (ventana + 1) * 100 // clasificador.CAL_VENTANAS)
+            lcd.mostrar("Calibrando...", "{}%".format(pct))
+
     base = None
     intento = 0
     while base is None:
         try:
             base = clasificador.calibrar_linea_base(
-                mpu, pzt, al_avance=sem.parpadeo_aprendizaje)
+                mpu, pzt, al_avance=al_avance_calibracion)
         except OSError as e:
             intento += 1
             print("[main] Calibracion fallida ({}): {}".format(intento, e))
@@ -113,6 +150,8 @@ def main():
     sem.mostrar(estado)
     ultima = None
     envio_en = time.ticks_ms()
+    lcd_estado_prev = None
+    lcd_ms_prev = time.ticks_ms()
     print("[main] Monitoreo activo - estado NORMAL")
 
     # Watchdog: si el loop se cuelga (p. ej. red sin respuesta), el Pico
@@ -167,6 +206,15 @@ def main():
 
                 if clasificador.ADAPTAR_BASE and estado == clasificador.NORMAL:
                     clasificador.adaptar_base(base, w["vib"])
+
+        # --- Pantalla LCD: estado + ultima ventana limpia (max. 1 vez/s) ---
+        ahora = time.ticks_ms()
+        if (lcd is not None and ultima is not None
+                and (estado != lcd_estado_prev
+                     or time.ticks_diff(ahora, lcd_ms_prev) >= 1000)):
+            mostrar_lcd(lcd, estado, ultima, base)
+            lcd_estado_prev = estado
+            lcd_ms_prev = ahora
 
         # --- Envío periódico a Spring Boot (entre ventanas) ---
         if ultima is not None and time.ticks_diff(
