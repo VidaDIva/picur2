@@ -17,6 +17,8 @@ import com.picur.demo.service.AnalizadorVibracionService;
 import com.picur.demo.service.AsistenteService;
 import com.picur.demo.service.MedicionVibracionService;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
@@ -30,6 +32,9 @@ import java.util.List;
 
 @Service
 public class MedicionVibracionServiceImpl implements MedicionVibracionService {
+
+    private static final Logger log =
+            LoggerFactory.getLogger(MedicionVibracionServiceImpl.class);
 
     private static final String MENSAJE_GUARDADO =
             "{\"tipo\":\"MEDICION\",\"datos\":%s}";
@@ -83,9 +88,21 @@ public class MedicionVibracionServiceImpl implements MedicionVibracionService {
             medicion.setEstado(estadoDispositivo);
         }
 
-        medicion.setFechaRegistro(sanearTimestamp(request.timestamp()));
+        LocalDateTime fechaRegistro = sanearTimestamp(request.timestamp());
+        medicion.setFechaRegistro(fechaRegistro);
 
         repository.save(medicion);
+
+        log.info("Medicion sensores device={} estadoDispositivo={} "
+                        + "estadoFinal={} indice={} timestampEnviado={} "
+                        + "timestampGuardado={} id={}",
+                request.dispositivo(),
+                request.estado(),
+                medicion.getEstado(),
+                medicion.getIndiceAnomalia(),
+                request.timestamp(),
+                fechaRegistro,
+                medicion.getId());
 
         notificar(medicion);
         asistente.analizar(medicion);
@@ -157,6 +174,11 @@ public class MedicionVibracionServiceImpl implements MedicionVibracionService {
     }
 
     private LocalDateTime sanearTimestamp(String timestampIso) {
+        if (timestampIso == null || timestampIso.isBlank()) {
+            log.warn("Timestamp ausente; se usa la hora del servidor");
+            return LocalDateTime.now();
+        }
+
         try {
             LocalDateTime timestamp =
                     LocalDateTime.parse(timestampIso);
@@ -168,8 +190,12 @@ public class MedicionVibracionServiceImpl implements MedicionVibracionService {
                     && anioRecibido <= anioActual + 1) {
                 return timestamp;
             }
+
+            log.warn("Timestamp fuera de rango ({}); se usa la hora del servidor",
+                    timestampIso);
         } catch (DateTimeParseException e) {
-            // Timestamp inválido -> se usa la hora del servidor
+            log.warn("Timestamp invalido ({}); se usa la hora del servidor: {}",
+                    timestampIso, e.getMessage());
         }
 
         return LocalDateTime.now();

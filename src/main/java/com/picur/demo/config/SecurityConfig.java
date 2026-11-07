@@ -2,6 +2,7 @@ package com.picur.demo.config;
 
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
@@ -23,6 +24,9 @@ public class SecurityConfig {
             HttpSecurity http) throws Exception {
 
         http
+                // CORS configurable para PWA/dashboard
+                .cors(Customizer.withDefaults())
+
                 // Para nuestra API REST desactivamos CSRF
                 .csrf(csrf -> csrf.disable())
 

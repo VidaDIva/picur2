@@ -10,7 +10,6 @@ import org.springframework.web.bind.annotation.*;
 
 @RestController
 @RequestMapping("/api/usuarios/recuperar")
-@CrossOrigin(origins = "http://localhost:4321")
 public class RecuperacionContrasenaController {
 
     private final RecuperacionContrasenaService service;

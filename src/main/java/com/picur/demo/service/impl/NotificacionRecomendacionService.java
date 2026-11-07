@@ -28,16 +28,19 @@ public class NotificacionRecomendacionService {
     private final RecomendacionRepository recomendacionRepository;
     private final CrearCuentaRepository usuarioRepository;
     private final NotificacionService notificaciones;
+    private final NotificacionPushService push;
     private final AsistenteIaService asistenteIa;
 
     public NotificacionRecomendacionService(
             RecomendacionRepository recomendacionRepository,
             CrearCuentaRepository usuarioRepository,
             NotificacionService notificaciones,
+            NotificacionPushService push,
             AsistenteIaService asistenteIa) {
         this.recomendacionRepository = recomendacionRepository;
         this.usuarioRepository = usuarioRepository;
         this.notificaciones = notificaciones;
+        this.push = push;
         this.asistenteIa = asistenteIa;
     }
 
@@ -70,6 +73,14 @@ public class NotificacionRecomendacionService {
         for (CrearCuenta usuario : usuarioRepository.findAll()) {
             notificaciones.enviarCorreo(usuario.getCorreo(), asunto,
                     cuerpoCorreo(recomendacion));
+        }
+
+        try {
+            push.enviarATodos(asunto, recomendacion.getRecomendacion(),
+                    "/recomendaciones");
+        } catch (RuntimeException e) {
+            log.warn("No se pudieron enviar las notificaciones push: {}",
+                    e.getMessage());
         }
     }
 

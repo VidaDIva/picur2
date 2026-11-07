@@ -5,26 +5,41 @@
 #     python -m mpremote connect com8 run firmware/pruebas/enviar_prueba.py
 # =============================================================================
 
-import time
-
 import config
+import logger
+import descubrimiento
+import wifi_manager
 import api_client
 
 
-def timestamp_iso():
-    ahora = time.localtime()
-    return "{:04d}-{:02d}-{:02d}T{:02d}:{:02d}:{:02d}".format(*ahora[:6])
+def obtener_redes():
+    redes = getattr(config, "REDES", None)
+    if redes:
+        return wifi_manager.normalizar_redes(redes)
+    if getattr(config, "WIFI_SSID", None):
+        return [{
+            "ssid": config.WIFI_SSID,
+            "password": getattr(config, "WIFI_PASSWORD", ""),
+            "pc_ip": getattr(config, "PC_IP", None),
+        }]
+    return []
 
 
 def main():
-    import wifi_manager
-    if not wifi_manager.conectar(config.WIFI_SSID, config.WIFI_PASSWORD):
+    red = wifi_manager.conectar_redes(obtener_redes())
+    if red is None:
         print("[prueba] Sin Wi-Fi")
+        return
+
+    logger.sincronizar_hora()
+    servidor = descubrimiento.resolver(red, forzar=True)
+    if servidor is None:
+        print("[prueba] Servidor no encontrado")
         return
 
     payload = {
         "dispositivo": config.DISPOSITIVO,
-        "timestamp": timestamp_iso(),
+        "timestamp": logger.timestamp_iso(),
         "aceleracionX": 0.01,
         "aceleracionY": -0.02,
         "aceleracionZ": 1.01,
@@ -35,7 +50,7 @@ def main():
         "umbral": 42.1,
         "estado": "PELIGRO",
     }
-    ok, cuerpo = api_client.enviar_medicion(payload)
+    ok, cuerpo = api_client.enviar_medicion(payload, servidor=servidor)
     print("[prueba] enviado:", ok)
     print("[prueba] respuesta:", cuerpo)
 

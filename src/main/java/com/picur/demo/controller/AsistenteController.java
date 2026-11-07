@@ -9,7 +9,6 @@ import org.springframework.web.bind.annotation.*;
 
 @RestController
 @RequestMapping("/api/asistente")
-@CrossOrigin(origins = "http://localhost:4321")
 public class AsistenteController {
 
     private final AsistenteService service;

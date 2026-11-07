@@ -31,3 +31,9 @@ build/
 
 ### VS Code ###
 .vscode/
+
+### Picur ###
+.env
+logs/
+firmware/redes.local.json
+*.log

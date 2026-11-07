@@ -16,7 +16,6 @@ import java.util.List;
 
 @RestController
 @RequestMapping("/api/mediciones")
-@CrossOrigin(origins = "http://localhost:4321")
 public class MedicionVibracionController {
 
     private final MedicionVibracionService service;

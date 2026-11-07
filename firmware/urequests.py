@@ -27,76 +27,104 @@ class Response:
         import ujson
         return ujson.loads(self.content)
 
-def request(method, url, data=None, json=None, headers={}, stream=None):
+
+def _alimentar(feed):
+    if feed:
+        feed()
+
+
+def _cerrar(sock):
     try:
-        proto, dummy, host, path = url.split("/", 3)
-    except ValueError:
-        proto, dummy, host = url.split("/", 2)
-        path = ""
-    if proto == "http:":
-        port = 80
-    elif proto == "https:":
-        import ussl
-        port = 443
-    else:
-        raise ValueError("Unsupported protocol: " + proto)
+        sock.close()
+    except Exception:
+        pass
 
-    if ":" in host:
-        host, port = host.split(":", 1)
-        port = int(port)
 
-    ai = usocket.getaddrinfo(host, port)
-    addr = ai[0][4]
-    sock = usocket.socket()
-    # Sin timeout, una red degradada colgaba el loop para siempre.
-    # 2 s por operación: el peor caso (conexión + línea + cuerpo) queda
-    # por debajo de los 8 s del watchdog.
-    sock.settimeout(2000)
-    sock.connect(addr)
-    if proto == "https:":
-        import ussl
-        sock = ussl.wrap_socket(sock, server_hostname=host)
+def request(method, url, data=None, json=None, headers={}, stream=None, feed=None):
+    sock = None
+    try:
+        try:
+            proto, dummy, host, path = url.split("/", 3)
+        except ValueError:
+            proto, dummy, host = url.split("/", 2)
+            path = ""
+        if proto == "http:":
+            port = 80
+        elif proto == "https:":
+            import ussl
+            port = 443
+        else:
+            raise ValueError("Unsupported protocol: " + proto)
 
-    sock.write(b"%s /%s HTTP/1.0\r\n" % (method, path))
-    if not "Host" in headers:
-        sock.write(b"Host: %s\r\n" % host)
-    for k in headers:
-        sock.write(k.encode())
-        sock.write(b": ")
-        sock.write(headers[k].encode())
+        if ":" in host:
+            host, port = host.split(":", 1)
+            port = int(port)
+
+        _alimentar(feed)
+        ai = usocket.getaddrinfo(host, port)
+        addr = ai[0][4]
+        sock = usocket.socket()
+        # MicroPython mide settimeout() en SEGUNDOS (no milisegundos).
+        # 1.5 s por operacion y watchdog alimentado entre pasos.
+        sock.settimeout(1.5)
+        sock.connect(addr)
+        if proto == "https:":
+            import ussl
+            sock = ussl.wrap_socket(sock, server_hostname=host)
+
+        _alimentar(feed)
+        sock.write(b"%s /%s HTTP/1.0\r\n" % (method, path))
+        if not "Host" in headers:
+            sock.write(b"Host: %s\r\n" % host)
+        sock.write(b"Connection: close\r\n")
+        for k in headers:
+            sock.write(k.encode())
+            sock.write(b": ")
+            sock.write(headers[k].encode())
+            sock.write(b"\r\n")
+        if json is not None:
+            import ujson
+            data = ujson.dumps(json)
+            sock.write(b"Content-Type: application/json\r\n")
+        if data:
+            sock.write(b"Content-Length: %d\r\n" % len(data))
         sock.write(b"\r\n")
-    if json is not None:
-        import ujson
-        data = ujson.dumps(json)
-        sock.write(b"Content-Type: application/json\r\n")
-    if data:
-        sock.write(b"Content-Length: %d\r\n" % len(data))
-    sock.write(b"\r\n")
-    if data:
-        sock.write(data if isinstance(data, bytes) else data.encode())
+        if data:
+            sock.write(data if isinstance(data, bytes) else data.encode())
 
-    l = sock.readline()
-    partes = l.split(None, 2)
-    protover = partes[0]
-    status = partes[1]
-    msg = partes[2] if len(partes) == 3 else b""
-    while True:
+        _alimentar(feed)
         l = sock.readline()
-        if not l or l == b"\r\n":
-            break
+        partes = l.split(None, 2)
+        protover = partes[0]
+        status = partes[1]
+        msg = partes[2] if len(partes) == 3 else b""
+        while True:
+            _alimentar(feed)
+            l = sock.readline()
+            if not l or l == b"\r\n":
+                break
 
-    resp = Response(sock)
-    resp.status_code = int(status)
-    return resp
+        resp = Response(sock)
+        resp.status_code = int(status)
+        sock = None
+        return resp
+    except Exception:
+        if sock is not None:
+            _cerrar(sock)
+        raise
+
 
 def get(url, **kw):
     return request("GET", url, **kw)
 
+
 def post(url, **kw):
     return request("POST", url, **kw)
 
+
 def put(url, **kw):
     return request("PUT", url, **kw)
+
 
 def delete(url, **kw):
     return request("DELETE", url, **kw)
